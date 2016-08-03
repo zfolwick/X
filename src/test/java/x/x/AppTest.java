@@ -1,5 +1,6 @@
 package x.x;
 
+import ThreadTester.ThreadObjects;
 import junit.framework.Assert;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -37,62 +38,95 @@ extends TestCase
 	{
 		// Create shared resource, and pass this shared resource to a method that shares it across threads.
 		MyCounter counter = new MyCounter();
-		Thread[] testThreads = createThreads(counter);
+		Thread[] testThreads = ThreadObjects.createThreads(new RunnableWrapper(counter), new RunnableWrapper(counter));
 		// execute threads on shared resource.  This should then modify the shared resource, which may now be checked.
-		runAllThreads(testThreads);
+		ThreadObjects.runAllThreads(testThreads);
 		// assert the end state
 		int valueAfter2MillionIterations=2000000;
 		Assert.assertEquals("OOPS!", valueAfter2MillionIterations, counter.value());
 	}
+	
+	public void testIncrementWhileDecrement()
+	{
+		// Create shared resource, and pass this shared resource to a method that shares it across threads.
+		MyCounter counter = new MyCounter();
+		Thread[] testThreads = ThreadObjects.createThreads(new IncrementWrapper(counter), new DecrementWrapper(counter));
 
-	/* 
-	 * Helper method- This creates the shared resource across all threads.
-	 */
-	public Thread[] createThreads(MyCounter counter) {
-		//Create two threads with shared resource of the CounterIncRunnable(counter) and kick them off
-		Thread thread1 = new Thread(new CounterIncRunnable(counter));
-		thread1.setName("add thread");
+		// execute threads on shared resource.  This should then modify the shared resource, which may now be checked.
+		ThreadObjects.runAllThreads(testThreads);
 
-		Thread thread2 = new Thread(new CounterIncRunnable(counter));
-		thread2.setName("add thread2");
-		Thread[] t;
-		t = new Thread[] {thread1, thread2};
-
-		return t;
+		// assert the end state
+		int valueAfter2MillionIterations = 0;
+		Assert.assertEquals("OOPS!", valueAfter2MillionIterations, counter.value());
 	}
 
-	// starts and executes all incoming threads.
-	public void runAllThreads(Thread[] t) {
-		int i=0;
-		int len = t.length - 1;
-		for (; i < len ; i++) {
-			t[i].start();
-			t[i+1].start();
-			try {
-				t[i].join();
-				t[i+1].join();
-			}catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+	public class IncrementWrapper implements Runnable {
+		private MyCounter cnt;
+		public IncrementWrapper(MyCounter counter) {
+			cnt = counter;
+		}
+
+		public void run() {
+			for ( int i=0; i<1000000; i++ ) {
+				cnt.increment();
+			}	
 		}
 	}
 	
-	/*
-	 * A runnable wrapper class that exercises the class under test
-	 */
-	class CounterIncRunnable implements Runnable {
-	private MyCounter counter;
+	public class DecrementWrapper implements Runnable {
+		private MyCounter cnt;
 
-	public CounterIncRunnable(MyCounter counter) {
-		this.counter = counter;
-	}
+		public DecrementWrapper(MyCounter counter) {
+			cnt = counter;
+		}
 
-	public void run() {
-		for ( int i=0; i<1000000; i++ ) {
-			counter.increment();
+		public void run() {
+			for ( int i=0; i<1000000; i++ ) {
+				cnt.decrement();
+			}	
 		}
 	}
-}
 
 
+	/*
+	 * A runnable wrapper class that exercises the class under test.  This include private instances of the shared resource under test
+	 * and the run function begins the actual exercising of the object under test.  A new wrapper class can easily be created for each api you
+	 * wish to test.
+	 * Usage:
+	 *    Thread t1 = new Thread(new GETApiCallWrapper(apiUnderTest));
+	 *    t2.setName("add thread");
+	 *    
+	 *    Thread t2 = new Thread(new PUTApiCallWrapper(apiUnderTest));
+	 *    t2.setName("add thread2");
+	 *    
+	 * where GETApiCallWrapper and PUTApiCallWrapper take as their constructor the context.
+	 * E.g.,
+	 * public IContent apiContent = RestApiGet.getDSContent();
+	 *  <some code>
+	 * Thread t1 = new Thread(new GETApiCallWrapper(apiContent));
+	 * 
+	 * and GETApiCallWrapper sets a private variable to the constructor parameter, and because it implements Runnable,
+	 * it has a run function, which calls the api:
+	 * 
+	 * run() {
+	 *    List<Content> myList = apiContent.getContentList(param1, param2, param3, param4);
+	 * }
+	 * 
+	 * The PUTApiCallWrapper is set up the same way, except that it modifies the data inside its run function.
+	 * 
+	 * These threads, when started at the same time, may show race conditions.
+	 */
+	class RunnableWrapper implements Runnable {
+		private MyCounter counter;
+
+		public RunnableWrapper(MyCounter counter) {
+			this.counter = counter;
+		}
+
+		public void run() {
+			for ( int i=0; i<1000000; i++ ) {
+				counter.increment();
+			}
+		}
+	}
 }

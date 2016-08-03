@@ -12,11 +12,12 @@ class MyCounter {
 	private volatile int c = 0;
 
 	//Adding a "synchronized" keyword here will cause the unit test to pass.
-	public void increment() {
+	public synchronized void increment() {
 		c++;
 	}
 
-	public   void decrement() {
+	//Adding a "synchronized" keyword here will cause the unit test to pass.
+	public synchronized void decrement() {
 		c--;
 	}
 
